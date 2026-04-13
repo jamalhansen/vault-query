@@ -39,6 +39,7 @@ def apply_fixes(
     data: dict,
     rename_keys: dict[str, str],
     field_values: dict[str, dict[str, str]],
+    set_fields: dict[str, str],
     lowercase_keys: bool,
 ) -> tuple[dict, list[str]]:
     """Return (modified_dict, list_of_change_descriptions)."""
@@ -65,6 +66,12 @@ def apply_fixes(
         else:
             result[new_key] = value
 
+    # Add set_fields that are absent (never overwrite existing values)
+    for key, value in set_fields.items():
+        if key not in result:
+            changes.append(f"  +{key}: {value!r}")
+            result[key] = value
+
     return result, changes
 
 
@@ -72,6 +79,7 @@ def process_vault(
     vault_path: Path,
     rename_keys: dict[str, str],
     field_values: dict[str, dict[str, str]],
+    set_fields: dict[str, str],
     lowercase_keys: bool,
     apply: bool,
     verbose: bool,
@@ -97,7 +105,7 @@ def process_vault(
             continue
 
         processed += 1
-        new_data, changes = apply_fixes(data, rename_keys, field_values, lowercase_keys)
+        new_data, changes = apply_fixes(data, rename_keys, field_values, set_fields, lowercase_keys)
 
         if not changes:
             continue
@@ -164,12 +172,15 @@ def main() -> None:
             mapping = yaml.safe_load(f)
         rename_keys = mapping.get("rename_keys", {})
         field_values = mapping.get("field_values", {})
+        set_fields = mapping.get("set_fields", {})
+    else:
+        set_fields = {}
 
     mode = "APPLYING" if args.apply else "DRY RUN"
     print(f"[{mode}] {vault_path}\n")
 
     processed, changed, skipped = process_vault(
-        vault_path, rename_keys, field_values,
+        vault_path, rename_keys, field_values, set_fields,
         lowercase_keys=args.lowercase_keys,
         apply=args.apply,
         verbose=args.verbose,
