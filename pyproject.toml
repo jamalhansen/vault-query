@@ -1,0 +1,26 @@
+[project]
+name = "vault-query"
+version = "0.1.0"
+description = "Query Obsidian vault frontmatter with SQL using DuckDB"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.0",
+    "pyyaml>=6.0",
+    "pandas>=2.0",
+]
+
+[project.scripts]
+vq = "vault_query.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+]
