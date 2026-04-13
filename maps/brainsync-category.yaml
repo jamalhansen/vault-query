@@ -1,0 +1,15 @@
+field_values:
+  category:
+    "Goal": "[[Goal]]"
+    "Book": "[[Book]]"
+    "Conference": "[[Conference]]"
+    "lists": "[[List]]"
+    "[[Templates/Blog Post|Blog Post]]": "[[Blog Post]]"
+    "[[Brainstorming]]": "[[Brainstorm]]"
+  status:
+    "Outline": "outline"
+    "Idea": "idea"
+    "Brainstorm": "brainstorm"
+    "Brainstorming": "brainstorm"
+    "Active": "active"
+    "prototype": "draft"
