@@ -12,6 +12,7 @@ dependencies = [
 [project.scripts]
 vq = "vault_query.main:main"
 vq-fix = "vault_query.fix:main"
+vq-todos = "vault_query.todos:main"
 
 [build-system]
 requires = ["hatchling"]
