@@ -66,15 +66,24 @@ def scan_vault(vault_path: Path, verbose: bool = False) -> list[dict]:
 
 
 def build_table(con: duckdb.DuckDBPyConnection, records: list[dict]) -> None:
-    """Load records into DuckDB as the 'notes' table via newline-delimited JSON."""
+    """Load records into DuckDB as the 'notes' table via newline-delimited JSON.
+
+    Records are normalized to a shared key set before writing so DuckDB infers
+    proper column types instead of collapsing to a MAP column when vaults have
+    heterogeneous frontmatter.
+    """
     if not records:
         con.execute("CREATE TABLE notes (path VARCHAR, filename VARCHAR)")
         return
 
+    # Collect all keys so every row has the same schema (missing fields -> null)
+    all_keys = set().union(*records)
+    normalized = [{k: record.get(k) for k in all_keys} for record in records]
+
     with tempfile.NamedTemporaryFile(
         mode="w", suffix=".ndjson", delete=False, encoding="utf-8"
     ) as f:
-        for record in records:
+        for record in normalized:
             f.write(json.dumps(record, default=str) + "\n")
         tmp_path = f.name
 

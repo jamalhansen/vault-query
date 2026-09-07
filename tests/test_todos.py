@@ -2,10 +2,12 @@ import json
 from datetime import date
 
 from vault_query.todos import (
+    _parse_obsidian_fields,
     mark_overdue,
     parse_notes,
     parse_queue,
     parse_reminders,
+    render_text,
     sort_key,
 )
 
@@ -99,6 +101,61 @@ class TestParseNotes:
         _vault(tmp_path)
         # reminders.md checkboxes must not be double-counted as notes
         assert parse_notes(tmp_path) == []
+
+
+class TestObsidianFields:
+    def test_due_date(self):
+        f = _parse_obsidian_fields("Buy milk 📅 2026-07-01")
+        assert f["date"] == "2026-07-01"
+
+    def test_start_date(self):
+        f = _parse_obsidian_fields("Write post 🛫 2026-06-30 📅 2026-07-05")
+        assert f["start"] == "2026-06-30"
+        assert f["date"] == "2026-07-05"
+
+    def test_scheduled_date(self):
+        f = _parse_obsidian_fields("Review PR ⏳ 2026-07-03")
+        assert f["scheduled"] == "2026-07-03"
+
+    def test_recurrence(self):
+        f = _parse_obsidian_fields("Weekly standup 🔁 every week 📅 2026-07-07")
+        assert "every week" in f["recurrence"]
+
+    def test_priority_high(self):
+        f = _parse_obsidian_fields("Critical fix 🔺 do it now")
+        assert f["priority"] == "highest"
+
+    def test_priority_low(self):
+        f = _parse_obsidian_fields("Nice to have 🔽 someday")
+        assert f["priority"] == "low"
+
+    def test_prefers_due_emoji_over_body_date(self, tmp_path):
+        (tmp_path / "note.md").write_text(
+            "- [ ] Do the thing (2026-06-01) #tag 📅 2026-07-15\n"
+        )
+        todos = parse_notes(tmp_path)
+        assert todos[0]["date"] == "2026-07-15"
+
+
+class TestNotStarted:
+    def test_not_started_flagged_for_future_start(self):
+        todos = [{"start": "2026-08-01"}, {"start": "2026-01-01"}, {"start": None}]
+        mark_overdue(todos, date(2026, 6, 28))
+        assert todos[0]["not_started"] is True
+        assert todos[1]["not_started"] is False
+        assert todos[2]["not_started"] is False
+
+
+class TestByFile:
+    def test_by_file_groups_on_location(self, tmp_path):
+        (tmp_path / "a.md").write_text("- [ ] task one\n- [ ] task two\n")
+        (tmp_path / "b.md").write_text("- [ ] task three\n")
+        todos = parse_notes(tmp_path)
+        mark_overdue(todos, date(2026, 6, 28))
+        output = render_text(todos, by_file=True)
+        assert "a.md" in output
+        assert "b.md" in output
+        assert output.index("a.md") < output.index("b.md")
 
 
 class TestOverdueAndSort:

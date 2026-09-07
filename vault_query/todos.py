@@ -9,6 +9,10 @@ Todos in a vault live in three disconnected places:
 
 This unifies all three into one list, sorted with overdue items first, and
 flags anything whose date has passed. Read-only: it never writes.
+
+Obsidian Tasks plugin fields extracted from note checkboxes:
+  📅 due date     🛫 start date    ⏳ scheduled date
+  🔁 recurrence   ⏫🔺🔼🔽➕ priority
 """
 
 import argparse
@@ -26,11 +30,46 @@ ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CHECKBOX_RE = re.compile(r"^\s*[-*] \[ \] (.+?)\s*$")
 SECTION_RE = re.compile(r"^#{1,6}\s+(.+?)\s*$")
 
+# Obsidian Tasks emoji field patterns.
+OB_DUE_RE = re.compile(r"📅\s*(\d{4}-\d{2}-\d{2})")
+OB_START_RE = re.compile(r"🛫\s*(\d{4}-\d{2}-\d{2})")
+OB_SCHED_RE = re.compile(r"⏳\s*(\d{4}-\d{2}-\d{2})")
+OB_RECUR_RE = re.compile(r"🔁\s*([^\U0001F300-\U0001FFFF]+?)(?=\s*(?:📅|🛫|⏳|🔁|⏫|🔺|🔼|🔽|➕|$))")
+OB_PRIORITY = {
+    "⏫": "urgent",
+    "🔺": "highest",
+    "🔼": "high",
+    "🔽": "low",
+    "➕": "lowest",
+}
+
 # Directories never scanned for stray checkboxes.
 SKIP_DIRS = {"archive", "templates", ".obsidian", ".trash", ".git"}
 
 # Queue statuses that are no longer actionable.
 DONE_STATUSES = {"done", "complete", "completed", "archived", "cancelled"}
+
+
+def _parse_obsidian_fields(body: str) -> dict:
+    """Extract Obsidian Tasks emoji fields from a checkbox body."""
+    fields: dict = {}
+    m = OB_DUE_RE.search(body)
+    if m:
+        fields["date"] = m.group(1)
+    m = OB_START_RE.search(body)
+    if m:
+        fields["start"] = m.group(1)
+    m = OB_SCHED_RE.search(body)
+    if m:
+        fields["scheduled"] = m.group(1)
+    m = OB_RECUR_RE.search(body)
+    if m:
+        fields["recurrence"] = m.group(1).strip()
+    for emoji, label in OB_PRIORITY.items():
+        if emoji in body:
+            fields["priority"] = label
+            break
+    return fields
 
 
 def parse_reminders(vault_path: Path, verbose: bool = False) -> list[dict]:
@@ -57,6 +96,10 @@ def parse_reminders(vault_path: Path, verbose: bool = False) -> list[dict]:
             {
                 "source": "reminders",
                 "date": item_date,
+                "start": None,
+                "scheduled": None,
+                "recurrence": None,
+                "priority": None,
                 "tag": tag,
                 "text": text,
                 "group": section,
@@ -104,6 +147,10 @@ def parse_queue(vault_path: Path, verbose: bool = False) -> list[dict]:
             {
                 "source": "queue",
                 "date": item_date,
+                "start": None,
+                "scheduled": None,
+                "recurrence": None,
+                "priority": None,
                 "tag": status or None,
                 "text": f"{text} [{phase}]" if phase else text,
                 "group": task.get("type"),
@@ -136,20 +183,30 @@ def parse_notes(
             lines = md.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             continue
+        rel = md.relative_to(vault_path)
         for lineno, line in enumerate(lines, 1):
             m = CHECKBOX_RE.match(line)
             if not m:
                 continue
             body = m.group(1).strip()
-            found = DATE_RE.search(body)
+            ob = _parse_obsidian_fields(body)
+            # Fall back to first plain date in body if no 📅 emoji.
+            if "date" not in ob:
+                found = DATE_RE.search(body)
+                if found:
+                    ob["date"] = found.group(1)
             todos.append(
                 {
                     "source": "notes",
-                    "date": found.group(1) if found else None,
+                    "date": ob.get("date"),
+                    "start": ob.get("start"),
+                    "scheduled": ob.get("scheduled"),
+                    "recurrence": ob.get("recurrence"),
+                    "priority": ob.get("priority"),
                     "tag": None,
                     "text": body,
                     "group": md.stem,
-                    "location": f"{md.relative_to(vault_path)}:{lineno}",
+                    "location": str(rel) + f":{lineno}",
                 }
             )
     if verbose:
@@ -171,9 +228,12 @@ def collect(
 
 
 def mark_overdue(todos: list[dict], today: date) -> None:
+    today_str = today.isoformat()
     for t in todos:
         d = t.get("date")
-        t["overdue"] = bool(d and ISO_DATE.match(d) and d < today.isoformat())
+        t["overdue"] = bool(d and ISO_DATE.match(d) and d < today_str)
+        s = t.get("start")
+        t["not_started"] = bool(s and ISO_DATE.match(s) and s > today_str)
 
 
 def sort_key(t: dict) -> tuple:
@@ -182,10 +242,41 @@ def sort_key(t: dict) -> tuple:
     return (not t.get("overdue"), d is None, d or "9999-99-99")
 
 
-def render_text(todos: list[dict]) -> str:
+def _fmt_meta(t: dict) -> str:
+    """Build a compact metadata suffix for display."""
+    parts = []
+    if t.get("start"):
+        parts.append(f"start:{t['start']}")
+    if t.get("scheduled"):
+        parts.append(f"sched:{t['scheduled']}")
+    if t.get("recurrence"):
+        parts.append(f"🔁{t['recurrence']}")
+    if t.get("priority"):
+        parts.append(t["priority"].upper())
+    if t.get("not_started"):
+        parts.append("NOT STARTED")
+    return f"  ({', '.join(parts)})" if parts else ""
+
+
+def render_text(todos: list[dict], by_file: bool = False) -> str:
     if not todos:
         return "No open todos found."
     out: list[str] = []
+
+    if by_file:
+        by_loc: dict[str, list[dict]] = {}
+        for t in todos:
+            file_key = t["location"].rsplit(":", 1)[0]
+            by_loc.setdefault(file_key, []).append(t)
+        for file_key, items in sorted(by_loc.items()):
+            out.append(f"\n--- {file_key} ({len(items)}) ---")
+            for t in items:
+                flag = "OVERDUE " if t.get("overdue") else ""
+                when = t["date"] or t.get("tag") or "—"
+                out.append(f"  [{flag}{when}] {t['text']}{_fmt_meta(t)}")
+                out.append(f"      ↳ {t['location']}")
+        return "\n".join(out)
+
     by_source: dict[str, list[dict]] = {}
     for t in todos:
         by_source.setdefault(t["source"], []).append(t)
@@ -204,14 +295,18 @@ def render_text(todos: list[dict]) -> str:
                     out.append(f"  # {last_group}")
             flag = "OVERDUE " if t.get("overdue") else ""
             when = t["date"] or t.get("tag") or "—"
-            out.append(f"  [{flag}{when}] {t['text']}")
+            out.append(f"  [{flag}{when}] {t['text']}{_fmt_meta(t)}")
             out.append(f"      ↳ {t['location']}")
     return "\n".join(out)
 
 
 def render_csv(todos: list[dict]) -> str:
     buf = io.StringIO()
-    cols = ["source", "date", "overdue", "tag", "group", "text", "location"]
+    cols = [
+        "source", "date", "overdue", "not_started",
+        "start", "scheduled", "recurrence", "priority",
+        "tag", "group", "text", "location",
+    ]
     w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
     w.writeheader()
     w.writerows(todos)
@@ -227,7 +322,9 @@ def main() -> None:
 Examples:
   vq-todos                       # all sources in KeySix, overdue first
   vq-todos --overdue             # only items past their date
-  vq-todos -s reminders          # just ops/reminders.md
+  vq-todos --not-started         # items whose start date is in the future
+  vq-todos -s notes --by-file    # note checkboxes grouped by file (for cleanup)
+  vq-todos BrainSync -s notes --by-file --overdue
   vq-todos BrainSync -f json     # another vault, JSON output
         """,
     )
@@ -238,8 +335,7 @@ Examples:
         help="Vault name (in ~/vaults/) or absolute path (default: KeySix or $VQ_TODOS_VAULT)",
     )
     parser.add_argument(
-        "--source",
-        "-s",
+        "--source", "-s",
         choices=["all", "reminders", "queue", "notes"],
         default="all",
         help="Which source(s) to pull from (default: all)",
@@ -248,15 +344,21 @@ Examples:
         "--overdue", "-o", action="store_true", help="Show only overdue items"
     )
     parser.add_argument(
-        "--format",
-        "-f",
+        "--not-started", "-n", action="store_true",
+        help="Show only items whose 🛫 start date is in the future",
+    )
+    parser.add_argument(
+        "--by-file", action="store_true",
+        help="Group output by source file (useful for bulk cleanup)",
+    )
+    parser.add_argument(
+        "--format", "-f",
         choices=["text", "json", "csv"],
         default="text",
         help="Output format (default: text)",
     )
     parser.add_argument(
-        "--include-archive",
-        "-a",
+        "--include-archive", "-a",
         action="store_true",
         help="Include checkboxes under archive/ (skipped by default)",
     )
@@ -287,8 +389,12 @@ Examples:
     sources = {"reminders", "queue", "notes"} if args.source == "all" else {args.source}
     todos = collect(vault_path, sources, args.include_archive, args.verbose)
     mark_overdue(todos, today)
+
     if args.overdue:
         todos = [t for t in todos if t["overdue"]]
+    if args.not_started:
+        todos = [t for t in todos if t.get("not_started")]
+
     todos.sort(key=sort_key)
 
     if args.format == "json":
@@ -296,14 +402,15 @@ Examples:
     elif args.format == "csv":
         print(render_csv(todos))
     else:
-        print(render_text(todos))
+        print(render_text(todos, by_file=args.by_file))
 
     overdue = sum(1 for t in todos if t.get("overdue"))
     dated = sum(1 for t in todos if t.get("date") and not t.get("overdue"))
     undated = len(todos) - overdue - dated
+    not_started = sum(1 for t in todos if t.get("not_started"))
     print(
         f"\nDone. Total: {len(todos)} "
-        f"(overdue {overdue}, dated {dated}, undated {undated})",
+        f"(overdue {overdue}, dated {dated}, undated {undated}, not-started {not_started})",
         file=sys.stderr,
     )
 
