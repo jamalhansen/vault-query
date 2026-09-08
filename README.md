@@ -52,6 +52,8 @@ items first, and flags anything past its date. Read-only.
 ```bash
 vq-todos                    # all sources in KeySix (default vault), overdue first
 vq-todos --overdue          # only items whose date has passed
+vq-todos --not-started      # items whose 🛫 start date is in the future
+vq-todos -s notes --by-file # note checkboxes grouped by source file (for cleanup)
 vq-todos -s reminders       # one source: reminders | queue | notes | all
 vq-todos -a                 # include checkboxes under archive/ (skipped by default)
 vq-todos BrainSync -f json  # another vault; -f text | json | csv
@@ -62,3 +64,8 @@ Default vault is `KeySix` (override with `$VQ_TODOS_VAULT` or a positional arg).
 A reminder line's leading token is read as a date (`2026-06-29:`) or a status tag
 (`active:`, `in-progress (Jordan):`). The summary line goes to stderr so piped
 output stays clean.
+
+**Obsidian Tasks emoji fields:** note checkboxes are also parsed for the
+[Obsidian Tasks](https://publish.obsidian.md/tasks/) plugin's emoji syntax --
+📅 due, 🛫 start, ⏳ scheduled, 🔁 recurrence, and priority (⏫🔺🔼🔽➕). A plain
+ISO date in the checkbox text is still picked up as a fallback when there's no 📅.
