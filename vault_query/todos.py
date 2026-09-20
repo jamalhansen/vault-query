@@ -22,7 +22,7 @@ import json
 import os
 import re
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
@@ -384,7 +384,7 @@ Examples:
             sys.exit(1)
         today = date.fromisoformat(args.today)
     else:
-        today = date.today()
+        today = datetime.now().astimezone().date()
 
     sources = {"reminders", "queue", "notes"} if args.source == "all" else {args.source}
     todos = collect(vault_path, sources, args.include_archive, args.verbose)
