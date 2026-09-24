@@ -13,6 +13,7 @@ from pathlib import Path
 
 import duckdb
 import yaml
+from local_first_common.tracking import timed_run
 
 
 def parse_frontmatter(filepath: Path) -> dict:
@@ -161,51 +162,55 @@ Examples:
     vault_arg = Path(args.vault)
     vault_path = vault_arg if vault_arg.is_absolute() else Path.home() / "vaults" / args.vault
 
-    if not args.reuse:
-        if not vault_path.exists():
-            print(f"Error: vault not found: {vault_path}", file=sys.stderr)
-            sys.exit(1)
-        if not vault_path.is_dir():
-            print(f"Error: not a directory: {vault_path}", file=sys.stderr)
-            sys.exit(1)
+    # No LLM model involved (model=None); this just gives vq a heartbeat on
+    # the fleet dashboard's activity panel, which vault_query was invisible to.
+    with timed_run("vault-query", None, source_location=str(vault_path)) as run:
+        if not args.reuse:
+            if not vault_path.exists():
+                print(f"Error: vault not found: {vault_path}", file=sys.stderr)
+                sys.exit(1)
+            if not vault_path.is_dir():
+                print(f"Error: not a directory: {vault_path}", file=sys.stderr)
+                sys.exit(1)
 
-    # Scan
-    if not args.reuse:
-        if args.verbose:
-            print(f"Scanning {vault_path} ...", file=sys.stderr)
-        records = scan_vault(vault_path, verbose=args.verbose)
-        notes_with_fm = sum(1 for r in records if len(r) > 2)
+        # Scan
+        if not args.reuse:
+            if args.verbose:
+                print(f"Scanning {vault_path} ...", file=sys.stderr)
+            records = scan_vault(vault_path, verbose=args.verbose)
+            notes_with_fm = sum(1 for r in records if len(r) > 2)
+            run.item_count = len(records)
 
-        if args.dry_run:
-            print(f"Vault:               {vault_path}")
-            print(f"Total .md files:     {len(records)}")
-            print(f"With frontmatter:    {notes_with_fm}")
-            print(f"Without frontmatter: {len(records) - notes_with_fm}")
-            print(f"\nDone. Processed: {len(records)}, Skipped: 0")
+            if args.dry_run:
+                print(f"Vault:               {vault_path}")
+                print(f"Total .md files:     {len(records)}")
+                print(f"With frontmatter:    {notes_with_fm}")
+                print(f"Without frontmatter: {len(records) - notes_with_fm}")
+                print(f"\nDone. Processed: {len(records)}, Skipped: 0")
+                return
+
+        # Connect to DuckDB
+        db_path = args.db or ":memory:"
+        con = duckdb.connect(db_path)
+
+        if not args.reuse:
+            build_table(con, records)
+            if args.verbose:
+                print(f"Loaded {len(records)} records into DuckDB", file=sys.stderr)
+
+        # Schema mode
+        if args.schema:
+            result = con.execute("DESCRIBE notes")
+            print(format_results(result, args.format))
             return
 
-    # Connect to DuckDB
-    db_path = args.db or ":memory:"
-    con = duckdb.connect(db_path)
-
-    if not args.reuse:
-        build_table(con, records)
-        if args.verbose:
-            print(f"Loaded {len(records)} records into DuckDB", file=sys.stderr)
-
-    # Schema mode
-    if args.schema:
-        result = con.execute("DESCRIBE notes")
-        print(format_results(result, args.format))
-        return
-
-    # Run query
-    try:
-        result = con.execute(args.query)
-        print(format_results(result, args.format))
-    except duckdb.Error as e:
-        print(f"Query error: {e}", file=sys.stderr)
-        sys.exit(1)
+        # Run query
+        try:
+            result = con.execute(args.query)
+            print(format_results(result, args.format))
+        except duckdb.Error as e:
+            print(f"Query error: {e}", file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":

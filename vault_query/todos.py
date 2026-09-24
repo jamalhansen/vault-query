@@ -25,6 +25,8 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
+from local_first_common.tracking import timed_run
+
 DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 CHECKBOX_RE = re.compile(r"^\s*[-*] \[ \] (.+?)\s*$")
@@ -378,41 +380,45 @@ Examples:
         print(f"Error: vault not found: {vault_path}", file=sys.stderr)
         sys.exit(1)
 
-    if args.today:
-        if not ISO_DATE.match(args.today):
-            print("Error: --today must be YYYY-MM-DD", file=sys.stderr)
-            sys.exit(1)
-        today = date.fromisoformat(args.today)
-    else:
-        today = datetime.now().astimezone().date()
+    # No LLM model involved (model=None); this just gives vq-todos a heartbeat
+    # on the fleet dashboard's activity panel, which vault_query was invisible to.
+    with timed_run("vault-query", None, source_location=str(vault_path)) as run:
+        if args.today:
+            if not ISO_DATE.match(args.today):
+                print("Error: --today must be YYYY-MM-DD", file=sys.stderr)
+                sys.exit(1)
+            today = date.fromisoformat(args.today)
+        else:
+            today = datetime.now().astimezone().date()
 
-    sources = {"reminders", "queue", "notes"} if args.source == "all" else {args.source}
-    todos = collect(vault_path, sources, args.include_archive, args.verbose)
-    mark_overdue(todos, today)
+        sources = {"reminders", "queue", "notes"} if args.source == "all" else {args.source}
+        todos = collect(vault_path, sources, args.include_archive, args.verbose)
+        mark_overdue(todos, today)
 
-    if args.overdue:
-        todos = [t for t in todos if t["overdue"]]
-    if args.not_started:
-        todos = [t for t in todos if t.get("not_started")]
+        if args.overdue:
+            todos = [t for t in todos if t["overdue"]]
+        if args.not_started:
+            todos = [t for t in todos if t.get("not_started")]
 
-    todos.sort(key=sort_key)
+        todos.sort(key=sort_key)
+        run.item_count = len(todos)
 
-    if args.format == "json":
-        print(json.dumps(todos, indent=2))
-    elif args.format == "csv":
-        print(render_csv(todos))
-    else:
-        print(render_text(todos, by_file=args.by_file))
+        if args.format == "json":
+            print(json.dumps(todos, indent=2))
+        elif args.format == "csv":
+            print(render_csv(todos))
+        else:
+            print(render_text(todos, by_file=args.by_file))
 
-    overdue = sum(1 for t in todos if t.get("overdue"))
-    dated = sum(1 for t in todos if t.get("date") and not t.get("overdue"))
-    undated = len(todos) - overdue - dated
-    not_started = sum(1 for t in todos if t.get("not_started"))
-    print(
-        f"\nDone. Total: {len(todos)} "
-        f"(overdue {overdue}, dated {dated}, undated {undated}, not-started {not_started})",
-        file=sys.stderr,
-    )
+        overdue = sum(1 for t in todos if t.get("overdue"))
+        dated = sum(1 for t in todos if t.get("date") and not t.get("overdue"))
+        undated = len(todos) - overdue - dated
+        not_started = sum(1 for t in todos if t.get("not_started"))
+        print(
+            f"\nDone. Total: {len(todos)} "
+            f"(overdue {overdue}, dated {dated}, undated {undated}, not-started {not_started})",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

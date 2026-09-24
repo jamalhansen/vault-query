@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 import yaml
+from local_first_common.tracking import timed_run
 
 
 def read_parts(filepath: Path) -> tuple[str, str] | None:
@@ -160,31 +161,35 @@ def main() -> None:
         print(f"Error: vault not found: {vault_path}", file=sys.stderr)
         sys.exit(1)
 
-    rename_keys: dict[str, str] = {}
-    field_values: dict[str, dict[str, str]] = {}
+    # No LLM model involved (model=None); this just gives vq-fix a heartbeat
+    # on the fleet dashboard's activity panel, which vault_query was invisible to.
+    with timed_run("vault-query", None, source_location=str(vault_path)) as run:
+        rename_keys: dict[str, str] = {}
+        field_values: dict[str, dict[str, str]] = {}
 
-    if args.map:
-        map_path = Path(args.map)
-        if not map_path.exists():
-            print(f"Error: map file not found: {map_path}", file=sys.stderr)
-            sys.exit(1)
-        with map_path.open(encoding="utf-8") as f:
-            mapping = yaml.safe_load(f)
-        rename_keys = mapping.get("rename_keys", {})
-        field_values = mapping.get("field_values", {})
-        set_fields = mapping.get("set_fields", {})
-    else:
-        set_fields = {}
+        if args.map:
+            map_path = Path(args.map)
+            if not map_path.exists():
+                print(f"Error: map file not found: {map_path}", file=sys.stderr)
+                sys.exit(1)
+            with map_path.open(encoding="utf-8") as f:
+                mapping = yaml.safe_load(f)
+            rename_keys = mapping.get("rename_keys", {})
+            field_values = mapping.get("field_values", {})
+            set_fields = mapping.get("set_fields", {})
+        else:
+            set_fields = {}
 
-    mode = "APPLYING" if args.apply else "DRY RUN"
-    print(f"[{mode}] {vault_path}\n")
+        mode = "APPLYING" if args.apply else "DRY RUN"
+        print(f"[{mode}] {vault_path}\n")
 
-    processed, changed, skipped = process_vault(
-        vault_path, rename_keys, field_values, set_fields,
-        lowercase_keys=args.lowercase_keys,
-        apply=args.apply,
-        verbose=args.verbose,
-    )
+        processed, changed, skipped = process_vault(
+            vault_path, rename_keys, field_values, set_fields,
+            lowercase_keys=args.lowercase_keys,
+            apply=args.apply,
+            verbose=args.verbose,
+        )
+        run.item_count = processed
 
-    print(f"\n{'Changes written' if args.apply else 'Would change'}: {changed} files")
-    print(f"Done. Processed: {processed}, Skipped: {skipped}")
+        print(f"\n{'Changes written' if args.apply else 'Would change'}: {changed} files")
+        print(f"Done. Processed: {processed}, Skipped: {skipped}")
