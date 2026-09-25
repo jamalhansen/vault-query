@@ -5,13 +5,15 @@ The vault is scanned for .md files; YAML frontmatter is extracted and loaded
 into a DuckDB table called `notes`. Any SQL query can then be run against it.
 """
 
-import argparse
 import json
 import sys
 import tempfile
+from enum import Enum
 from pathlib import Path
+from typing import Annotated
 
 import duckdb
+import typer
 from local_first_common.obsidian import parse_frontmatter
 from local_first_common.tracking import timed_run
 
@@ -79,84 +81,70 @@ def format_results(result: duckdb.DuckDBPyRelation, fmt: str) -> str:
     return df.to_string(index=False)
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog="vq",
-        description="Query Obsidian vault frontmatter with SQL (table name: notes)",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  vq BrainSync "SELECT type, count(*) FROM notes GROUP BY type ORDER BY 2 DESC"
-  vq Contexta "SELECT path, description FROM notes WHERE status = 'seed'"
-  vq Contexta "SELECT domain, count(*) FROM notes GROUP BY domain"
-  vq BrainSync --schema
+class OutputFormat(str, Enum):
+    table = "table"
+    csv = "csv"
+    json = "json"
+
+
+app = typer.Typer(add_completion=False)
+
+EXAMPLES = """
+Examples:\n
+  vq BrainSync "SELECT type, count(*) FROM notes GROUP BY type ORDER BY 2 DESC"\n
+  vq Contexta "SELECT path, description FROM notes WHERE status = 'seed'"\n
+  vq BrainSync --schema\n
   vq Contexta --dry-run
-        """,
-    )
-    parser.add_argument("vault", help="Vault name (in ~/vaults/) or absolute path")
-    parser.add_argument("query", nargs="?", help="SQL query to run (table: notes)")
-    parser.add_argument(
-        "--schema", "-s", action="store_true", help="Show available columns and types"
-    )
-    parser.add_argument(
-        "--db",
-        "-d",
-        metavar="FILE",
-        help="Persist DuckDB to file instead of in-memory (reuse with --reuse)",
-    )
-    parser.add_argument(
-        "--reuse",
-        "-r",
-        action="store_true",
-        help="Reuse an existing --db file without re-scanning the vault",
-    )
-    parser.add_argument(
-        "--format",
-        "-f",
-        choices=["table", "csv", "json"],
-        default="table",
-        help="Output format (default: table)",
-    )
-    parser.add_argument(
-        "--verbose", "-V", action="store_true", help="Show debug output on stderr"
-    )
-    parser.add_argument(
-        "--dry-run",
-        "-n",
-        action="store_true",
-        help="Scan vault and show stats without running a query",
-    )
+"""
 
-    args = parser.parse_args()
 
-    # Validate: need something to do
-    if not args.dry_run and not args.query and not args.schema:
-        parser.error("provide a SQL query, or use --schema / --dry-run")
+@app.command(epilog=EXAMPLES)
+def main(
+    vault: Annotated[str, typer.Argument(help="Vault name (in ~/vaults/) or absolute path")],
+    query: Annotated[str | None, typer.Argument(help="SQL query to run (table: notes)")] = None,
+    schema: Annotated[bool, typer.Option("--schema", "-s", help="Show available columns and types")] = False,
+    db: Annotated[
+        str | None,
+        typer.Option("--db", "-d", metavar="FILE", help="Persist DuckDB to file instead of in-memory (reuse with --reuse)"),
+    ] = None,
+    reuse: Annotated[
+        bool, typer.Option("--reuse", "-r", help="Reuse an existing --db file without re-scanning the vault")
+    ] = False,
+    fmt: Annotated[OutputFormat, typer.Option("--format", "-f", help="Output format")] = OutputFormat.table,
+    verbose: Annotated[bool, typer.Option("--verbose", "-V", help="Show debug output on stderr")] = False,
+    dry_run: Annotated[
+        bool, typer.Option("--dry-run", "-n", help="Scan vault and show stats without running a query")
+    ] = False,
+) -> None:
+    """Query Obsidian vault frontmatter with SQL (table name: notes)."""
+    if not dry_run and not query and not schema:
+        typer.echo("Error: provide a SQL query, or use --schema / --dry-run", err=True)
+        raise typer.Exit(2)  # a usage error, like any other bad invocation
 
     # Resolve vault path
-    vault_arg = Path(args.vault)
-    vault_path = vault_arg if vault_arg.is_absolute() else Path.home() / "vaults" / args.vault
+    vault_arg = Path(vault)
+    vault_path = vault_arg if vault_arg.is_absolute() else Path.home() / "vaults" / vault
 
     # No LLM model involved (model=None); this just gives vq a heartbeat on
     # the fleet dashboard's activity panel, which vault_query was invisible to.
     with timed_run("vault-query", None, source_location=str(vault_path)) as run:
-        if not args.reuse:
+        if not reuse:
             if not vault_path.exists():
                 print(f"Error: vault not found: {vault_path}", file=sys.stderr)
-                sys.exit(1)
+                raise typer.Exit(1)
             if not vault_path.is_dir():
                 print(f"Error: not a directory: {vault_path}", file=sys.stderr)
-                sys.exit(1)
+                raise typer.Exit(1)
 
         # Scan
-        if not args.reuse:
-            if args.verbose:
+        if not reuse:
+            if verbose:
                 print(f"Scanning {vault_path} ...", file=sys.stderr)
-            records = scan_vault(vault_path, verbose=args.verbose)
+            records = scan_vault(vault_path, verbose=verbose)
             notes_with_fm = sum(1 for r in records if len(r) > 2)
             run.item_count = len(records)
 
-            if args.dry_run:
+            if dry_run:
                 print(f"Vault:               {vault_path}")
                 print(f"Total .md files:     {len(records)}")
                 print(f"With frontmatter:    {notes_with_fm}")
@@ -165,28 +153,28 @@ Examples:
                 return
 
         # Connect to DuckDB
-        db_path = args.db or ":memory:"
+        db_path = db or ":memory:"
         con = duckdb.connect(db_path)
 
-        if not args.reuse:
+        if not reuse:
             build_table(con, records)
-            if args.verbose:
+            if verbose:
                 print(f"Loaded {len(records)} records into DuckDB", file=sys.stderr)
 
         # Schema mode
-        if args.schema:
+        if schema:
             result = con.execute("DESCRIBE notes")
-            print(format_results(result, args.format))
+            print(format_results(result, fmt.value))
             return
 
         # Run query
         try:
-            result = con.execute(args.query)
-            print(format_results(result, args.format))
+            result = con.execute(query)
+            print(format_results(result, fmt.value))
         except duckdb.Error as e:
             print(f"Query error: {e}", file=sys.stderr)
-            sys.exit(1)
+            raise typer.Exit(1)
 
 
 if __name__ == "__main__":
-    main()
+    app()

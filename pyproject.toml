@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "Query Obsidian vault frontmatter with SQL using DuckDB"
 requires-python = ">=3.12"
 dependencies = [
+    "typer>=0.15.0",
+    "click<8.3.2",  # 8.3.2 breaks typer 0.24.1 option parsing (same pin as the rest of the fleet)
     "duckdb>=1.0",
     "pyyaml>=6.0",
     "pandas>=2.0",
@@ -11,9 +13,9 @@ dependencies = [
 ]
 
 [project.scripts]
-vq = "vault_query.main:main"
-vq-fix = "vault_query.fix:main"
-vq-todos = "vault_query.todos:main"
+vq = "vault_query.main:app"
+vq-fix = "vault_query.fix:app"
+vq-todos = "vault_query.todos:app"
 
 [build-system]
 requires = ["hatchling"]
@@ -30,3 +32,6 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.4",
 ]
+
+[tool.fleet.exempt]
+entry-points = "three separate commands (vq, vq-fix, vq-todos), each a Typer app in its own module"

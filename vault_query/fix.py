@@ -4,10 +4,11 @@ vq-fix -- Apply frontmatter normalization rules to an Obsidian vault.
 Dry-runs by default. Pass --apply to write changes.
 """
 
-import argparse
 import sys
 from pathlib import Path
+from typing import Annotated
 
+import typer
 import yaml
 from local_first_common.obsidian import split_frontmatter
 from local_first_common.tracking import timed_run
@@ -111,37 +112,32 @@ def process_vault(
     return processed, changed, skipped
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog="vq-fix",
-        description="Normalize frontmatter in an Obsidian vault (dry-run by default)",
-    )
-    parser.add_argument("vault", help="Vault name (in ~/vaults/) or absolute path")
-    parser.add_argument(
-        "--map", "-m", metavar="FILE",
-        help="YAML file defining rename_keys and field_values mappings",
-    )
-    parser.add_argument(
-        "--lowercase-keys", "-l", action="store_true",
-        help="Lowercase all frontmatter keys (applied after --map renames)",
-    )
-    parser.add_argument(
-        "--apply", "-a", action="store_true",
-        help="Write changes (default is dry-run)",
-    )
-    parser.add_argument("--verbose", "-V", action="store_true")
+app = typer.Typer(add_completion=False)
 
-    args = parser.parse_args()
 
-    if not args.map and not args.lowercase_keys:
-        parser.error("provide --map, --lowercase-keys, or both")
+@app.command()
+def main(
+    vault: Annotated[str, typer.Argument(help="Vault name (in ~/vaults/) or absolute path")],
+    map_file: Annotated[
+        str | None, typer.Option("--map", "-m", metavar="FILE", help="YAML file defining rename_keys and field_values mappings")
+    ] = None,
+    lowercase_keys: Annotated[
+        bool, typer.Option("--lowercase-keys", "-l", help="Lowercase all frontmatter keys (applied after --map renames)")
+    ] = False,
+    apply: Annotated[bool, typer.Option("--apply", "-a", help="Write changes (default is dry-run)")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-V")] = False,
+) -> None:
+    """Normalize frontmatter in an Obsidian vault (dry-run by default)."""
+    if not map_file and not lowercase_keys:
+        typer.echo("Error: provide --map, --lowercase-keys, or both", err=True)
+        raise typer.Exit(2)  # a usage error, like any other bad invocation
 
-    vault_arg = Path(args.vault)
-    vault_path = vault_arg if vault_arg.is_absolute() else Path.home() / "vaults" / args.vault
+    vault_arg = Path(vault)
+    vault_path = vault_arg if vault_arg.is_absolute() else Path.home() / "vaults" / vault
 
     if not vault_path.is_dir():
         print(f"Error: vault not found: {vault_path}", file=sys.stderr)
-        sys.exit(1)
+        raise typer.Exit(1)
 
     # No LLM model involved (model=None); this just gives vq-fix a heartbeat
     # on the fleet dashboard's activity panel, which vault_query was invisible to.
@@ -149,11 +145,11 @@ def main() -> None:
         rename_keys: dict[str, str] = {}
         field_values: dict[str, dict[str, str]] = {}
 
-        if args.map:
-            map_path = Path(args.map)
+        if map_file:
+            map_path = Path(map_file)
             if not map_path.exists():
                 print(f"Error: map file not found: {map_path}", file=sys.stderr)
-                sys.exit(1)
+                raise typer.Exit(1)
             with map_path.open(encoding="utf-8") as f:
                 mapping = yaml.safe_load(f)
             rename_keys = mapping.get("rename_keys", {})
@@ -162,16 +158,16 @@ def main() -> None:
         else:
             set_fields = {}
 
-        mode = "APPLYING" if args.apply else "DRY RUN"
+        mode = "APPLYING" if apply else "DRY RUN"
         print(f"[{mode}] {vault_path}\n")
 
         processed, changed, skipped = process_vault(
             vault_path, rename_keys, field_values, set_fields,
-            lowercase_keys=args.lowercase_keys,
-            apply=args.apply,
-            verbose=args.verbose,
+            lowercase_keys=lowercase_keys,
+            apply=apply,
+            verbose=verbose,
         )
         run.item_count = processed
 
-        print(f"\n{'Changes written' if args.apply else 'Would change'}: {changed} files")
+        print(f"\n{'Changes written' if apply else 'Would change'}: {changed} files")
         print(f"Done. Processed: {processed}, Skipped: {skipped}")

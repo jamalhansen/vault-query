@@ -1,0 +1,135 @@
+{
+  "fix-lowercase-dry": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": "[DRY RUN] <TMP>/vaults/Sample\n\n\nWould change: 0 files\nDone. Processed: 2, Skipped: 2\n"
+  },
+  "fix-map-apply": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": "[APPLYING] <TMP>/vaults/Sample\n\nactive_note.md\n  +reviewed: 'no'\nseed_note.md\n  +reviewed: 'no'\n\nChanges written: 2 files\nDone. Processed: 2, Skipped: 2\n"
+  },
+  "fix-missing-map": {
+    "exit": 1,
+    "stderr": "Error: map file not found: <TMP>/none.yaml\n",
+    "stdout": ""
+  },
+  "fix-missing-vault": {
+    "exit": 1,
+    "stderr": "Error: vault not found: <TMP>/vaults/Nowhere\n",
+    "stdout": ""
+  },
+  "fix-nothing": {
+    "exit": 2,
+    "stdout": ""
+  },
+  "todos-all": {
+    "exit": 0,
+    "stderr": "\nDone. Total: 4 (overdue 1, dated 2, undated 1, not-started 1)\n",
+    "stdout": "\n=== IN-NOTE CHECKBOXES (4) ===\n  # tasks\n  [OVERDUE 2026-01-01] overdue thing \ud83d\udcc5 2026-01-01\n      \u21b3 tasks.md:2\n  [2027-02-01] not started \ud83d\udeeb 2027-01-01 \ud83d\udcc5 2027-02-01  (start:2027-01-01, NOT STARTED)\n      \u21b3 tasks.md:4\n  [2027-06-01] later thing \ud83d\udcc5 2027-06-01\n      \u21b3 tasks.md:3\n  [\u2014] undated thing\n      \u21b3 tasks.md:5\n"
+  },
+  "todos-bad-source": {
+    "exit": 2,
+    "stdout": ""
+  },
+  "todos-bad-today": {
+    "exit": 1,
+    "stderr": "Error: --today must be YYYY-MM-DD\n",
+    "stdout": ""
+  },
+  "todos-csv-archive": {
+    "exit": 0,
+    "stderr": "\nDone. Total: 4 (overdue 1, dated 2, undated 1, not-started 1)\n",
+    "stdout": "source,date,overdue,not_started,start,scheduled,recurrence,priority,tag,group,text,location\nnotes,2026-01-01,True,False,,,,,,tasks,overdue thing \ud83d\udcc5 2026-01-01,tasks.md:2\nnotes,2027-02-01,False,True,2027-01-01,,,,,tasks,not started \ud83d\udeeb 2027-01-01 \ud83d\udcc5 2027-02-01,tasks.md:4\nnotes,2027-06-01,False,False,,,,,,tasks,later thing \ud83d\udcc5 2027-06-01,tasks.md:3\nnotes,,False,False,,,,,,tasks,undated thing,tasks.md:5\n"
+  },
+  "todos-default-vault": {
+    "exit": 0,
+    "stderr": "\nDone. Total: 4 (overdue 1, dated 2, undated 1, not-started 1)\n",
+    "stdout": "\n=== IN-NOTE CHECKBOXES (4) ===\n  # tasks\n  [OVERDUE 2026-01-01] overdue thing \ud83d\udcc5 2026-01-01\n      \u21b3 tasks.md:2\n  [2027-02-01] not started \ud83d\udeeb 2027-01-01 \ud83d\udcc5 2027-02-01  (start:2027-01-01, NOT STARTED)\n      \u21b3 tasks.md:4\n  [2027-06-01] later thing \ud83d\udcc5 2027-06-01\n      \u21b3 tasks.md:3\n  [\u2014] undated thing\n      \u21b3 tasks.md:5\n"
+  },
+  "todos-json": {
+    "exit": 0,
+    "stderr": "\nDone. Total: 4 (overdue 1, dated 2, undated 1, not-started 1)\n",
+    "stdout": "[\n  {\n    \"source\": \"notes\",\n    \"date\": \"2026-01-01\",\n    \"start\": null,\n    \"scheduled\": null,\n    \"recurrence\": null,\n    \"priority\": null,\n    \"tag\": null,\n    \"text\": \"overdue thing \\ud83d\\udcc5 2026-01-01\",\n    \"group\": \"tasks\",\n    \"location\": \"tasks.md:2\",\n    \"overdue\": true,\n    \"not_started\": false\n  },\n  {\n    \"source\": \"notes\",\n    \"date\": \"2027-02-01\",\n    \"start\": \"2027-01-01\",\n    \"scheduled\": null,\n    \"recurrence\": null,\n    \"priority\": null,\n    \"tag\": null,\n    \"text\": \"not started \\ud83d\\udeeb 2027-01-01 \\ud83d\\udcc5 2027-02-01\",\n    \"group\": \"tasks\",\n    \"location\": \"tasks.md:4\",\n    \"overdue\": false,\n    \"not_started\": true\n  },\n  {\n    \"source\": \"notes\",\n    \"date\": \"2027-06-01\",\n    \"start\": null,\n    \"scheduled\": null,\n    \"recurrence\": null,\n    \"priority\": null,\n    \"tag\": null,\n    \"text\": \"later thing \\ud83d\\udcc5 2027-06-01\",\n    \"group\": \"tasks\",\n    \"location\": \"tasks.md:3\",\n    \"overdue\": false,\n    \"not_started\": false\n  },\n  {\n    \"source\": \"notes\",\n    \"date\": null,\n    \"start\": null,\n    \"scheduled\": null,\n    \"recurrence\": null,\n    \"priority\": null,\n    \"tag\": null,\n    \"text\": \"undated thing\",\n    \"group\": \"tasks\",\n    \"location\": \"tasks.md:5\",\n    \"overdue\": false,\n    \"not_started\": false\n  }\n]\n"
+  },
+  "todos-missing-vault": {
+    "exit": 1,
+    "stderr": "Error: vault not found: <TMP>/vaults/Nowhere\n",
+    "stdout": ""
+  },
+  "todos-not-started": {
+    "exit": 0,
+    "stderr": "\nDone. Total: 1 (overdue 0, dated 1, undated 0, not-started 1)\n",
+    "stdout": "\n=== IN-NOTE CHECKBOXES (1) ===\n  # tasks\n  [2027-02-01] not started \ud83d\udeeb 2027-01-01 \ud83d\udcc5 2027-02-01  (start:2027-01-01, NOT STARTED)\n      \u21b3 tasks.md:4\n"
+  },
+  "todos-notes-by-file": {
+    "exit": 0,
+    "stderr": "\nDone. Total: 4 (overdue 1, dated 2, undated 1, not-started 1)\n",
+    "stdout": "\n--- tasks.md (4) ---\n  [OVERDUE 2026-01-01] overdue thing \ud83d\udcc5 2026-01-01\n      \u21b3 tasks.md:2\n  [2027-02-01] not started \ud83d\udeeb 2027-01-01 \ud83d\udcc5 2027-02-01  (start:2027-01-01, NOT STARTED)\n      \u21b3 tasks.md:4\n  [2027-06-01] later thing \ud83d\udcc5 2027-06-01\n      \u21b3 tasks.md:3\n  [\u2014] undated thing\n      \u21b3 tasks.md:5\n"
+  },
+  "todos-overdue": {
+    "exit": 0,
+    "stderr": "\nDone. Total: 1 (overdue 1, dated 0, undated 0, not-started 0)\n",
+    "stdout": "\n=== IN-NOTE CHECKBOXES (1) ===\n  # tasks\n  [OVERDUE 2026-01-01] overdue thing \ud83d\udcc5 2026-01-01\n      \u21b3 tasks.md:2\n"
+  },
+  "vq-absolute": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": " n\n 4\n"
+  },
+  "vq-bad-format": {
+    "exit": 2,
+    "stdout": ""
+  },
+  "vq-bad-sql": {
+    "exit": 1,
+    "stderr": "Query error: Parser Error: syntax error at or near \"SELEC\"\n\nLINE 1: SELEC nope\n        ^\n",
+    "stdout": ""
+  },
+  "vq-count": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": " n\n 4\n"
+  },
+  "vq-db-then-reuse": [
+    {
+      "exit": 0,
+      "stderr": "",
+      "stdout": " count_star()\n            4\n"
+    },
+    {
+      "exit": 0,
+      "stderr": "",
+      "stdout": " count_star()\n            4\n"
+    }
+  ],
+  "vq-dry-run": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": "Vault:               <TMP>/vaults/Sample\nTotal .md files:     4\nWith frontmatter:    2\nWithout frontmatter: 2\n\nDone. Processed: 4, Skipped: 0\n"
+  },
+  "vq-json": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": "[\n  {\n    \"path\":\"active_note.md\"\n  },\n  {\n    \"path\":\"no_frontmatter.md\"\n  },\n  {\n    \"path\":\"seed_note.md\"\n  }\n]\n"
+  },
+  "vq-missing-vault": {
+    "exit": 1,
+    "stderr": "Error: vault not found: <TMP>/vaults/Nowhere\n",
+    "stdout": ""
+  },
+  "vq-nothing-to-do": {
+    "exit": 2,
+    "stdout": ""
+  },
+  "vq-schema-csv": {
+    "exit": 0,
+    "stderr": "",
+    "stdout": "column_name,column_type,null,key,default,extra\npath,VARCHAR,YES,,,\nfilename,VARCHAR,YES,,,\ncreated,DATE,YES,,,\ndescription,VARCHAR,YES,,,\ndomain,VARCHAR,YES,,,\nstatus,VARCHAR,YES,,,\ntags,VARCHAR,YES,,,\ntype,VARCHAR,YES,,,\n\n"
+  },
+  "vq-verbose": {
+    "exit": 0,
+    "stderr": "Scanning <TMP>/vaults/Sample ...\n  Found 4 .md files\nLoaded 4 records into DuckDB\n",
+    "stdout": " count_star()\n            4\n"
+  }
+}

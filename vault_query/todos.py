@@ -15,16 +15,17 @@ Obsidian Tasks plugin fields extracted from note checkboxes:
   🔁 recurrence   ⏫🔺🔼🔽➕ priority
 """
 
-import argparse
 import csv
 import io
 import json
-import os
 import re
 import sys
 from datetime import date, datetime
+from enum import Enum
 from pathlib import Path
+from typing import Annotated
 
+import typer
 from local_first_common.tracking import timed_run
 
 DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
@@ -315,100 +316,91 @@ def render_csv(todos: list[dict]) -> str:
     return buf.getvalue().rstrip("\n")
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        prog="vq-todos",
-        description="Aggregate actionable todos across a vault (reminders + queue + note checkboxes)",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  vq-todos                       # all sources in KeySix, overdue first
-  vq-todos --overdue             # only items past their date
-  vq-todos --not-started         # items whose start date is in the future
-  vq-todos -s notes --by-file    # note checkboxes grouped by file (for cleanup)
-  vq-todos BrainSync -s notes --by-file --overdue
-  vq-todos BrainSync -f json     # another vault, JSON output
-        """,
-    )
-    parser.add_argument(
-        "vault",
-        nargs="?",
-        default=os.environ.get("VQ_TODOS_VAULT", "KeySix"),
-        help="Vault name (in ~/vaults/) or absolute path (default: KeySix or $VQ_TODOS_VAULT)",
-    )
-    parser.add_argument(
-        "--source", "-s",
-        choices=["all", "reminders", "queue", "notes"],
-        default="all",
-        help="Which source(s) to pull from (default: all)",
-    )
-    parser.add_argument(
-        "--overdue", "-o", action="store_true", help="Show only overdue items"
-    )
-    parser.add_argument(
-        "--not-started", "-n", action="store_true",
-        help="Show only items whose 🛫 start date is in the future",
-    )
-    parser.add_argument(
-        "--by-file", action="store_true",
-        help="Group output by source file (useful for bulk cleanup)",
-    )
-    parser.add_argument(
-        "--format", "-f",
-        choices=["text", "json", "csv"],
-        default="text",
-        help="Output format (default: text)",
-    )
-    parser.add_argument(
-        "--include-archive", "-a",
-        action="store_true",
-        help="Include checkboxes under archive/ (skipped by default)",
-    )
-    parser.add_argument(
-        "--today",
-        metavar="YYYY-MM-DD",
-        help="Override today's date for overdue calculation (testing)",
-    )
-    parser.add_argument(
-        "--verbose", "-V", action="store_true", help="Show debug output on stderr"
-    )
-    args = parser.parse_args()
+class Source(str, Enum):
+    all = "all"
+    reminders = "reminders"
+    queue = "queue"
+    notes = "notes"
 
-    vault_arg = Path(args.vault)
-    vault_path = vault_arg if vault_arg.is_absolute() else Path.home() / "vaults" / args.vault
+
+class TodoFormat(str, Enum):
+    text = "text"
+    json = "json"
+    csv = "csv"
+
+
+app = typer.Typer(add_completion=False)
+
+EXAMPLES = """
+Examples:\n
+  vq-todos                       # all sources in KeySix, overdue first\n
+  vq-todos --overdue             # only items past their date\n
+  vq-todos --not-started         # items whose start date is in the future\n
+  vq-todos -s notes --by-file    # note checkboxes grouped by file (for cleanup)\n
+  vq-todos BrainSync -f json     # another vault, JSON output
+"""
+
+
+@app.command(epilog=EXAMPLES)
+def main(
+    vault: Annotated[
+        str,
+        typer.Argument(
+            envvar="VQ_TODOS_VAULT",
+            help="Vault name (in ~/vaults/) or absolute path (default: KeySix or $VQ_TODOS_VAULT)",
+        ),
+    ] = "KeySix",
+    source: Annotated[Source, typer.Option("--source", "-s", help="Which source(s) to pull from")] = Source.all,
+    overdue: Annotated[bool, typer.Option("--overdue", "-o", help="Show only overdue items")] = False,
+    not_started: Annotated[
+        bool, typer.Option("--not-started", "-n", help="Show only items whose 🛫 start date is in the future")
+    ] = False,
+    by_file: Annotated[bool, typer.Option("--by-file", help="Group output by source file (useful for bulk cleanup)")] = False,
+    fmt: Annotated[TodoFormat, typer.Option("--format", "-f", help="Output format")] = TodoFormat.text,
+    include_archive: Annotated[
+        bool, typer.Option("--include-archive", "-a", help="Include checkboxes under archive/ (skipped by default)")
+    ] = False,
+    today_arg: Annotated[
+        str | None, typer.Option("--today", metavar="YYYY-MM-DD", help="Override today's date for overdue calculation (testing)")
+    ] = None,
+    verbose: Annotated[bool, typer.Option("--verbose", "-V", help="Show debug output on stderr")] = False,
+) -> None:
+    """Aggregate actionable todos across a vault (reminders + queue + note checkboxes)."""
+    vault_arg = Path(vault)
+    vault_path = vault_arg if vault_arg.is_absolute() else Path.home() / "vaults" / vault
     if not vault_path.is_dir():
         print(f"Error: vault not found: {vault_path}", file=sys.stderr)
-        sys.exit(1)
+        raise typer.Exit(1)
 
     # No LLM model involved (model=None); this just gives vq-todos a heartbeat
     # on the fleet dashboard's activity panel, which vault_query was invisible to.
     with timed_run("vault-query", None, source_location=str(vault_path)) as run:
-        if args.today:
-            if not ISO_DATE.match(args.today):
+        if today_arg:
+            if not ISO_DATE.match(today_arg):
                 print("Error: --today must be YYYY-MM-DD", file=sys.stderr)
-                sys.exit(1)
-            today = date.fromisoformat(args.today)
+                raise typer.Exit(1)
+            today = date.fromisoformat(today_arg)
         else:
             today = datetime.now().astimezone().date()
 
-        sources = {"reminders", "queue", "notes"} if args.source == "all" else {args.source}
-        todos = collect(vault_path, sources, args.include_archive, args.verbose)
+        sources = {"reminders", "queue", "notes"} if source == Source.all else {source.value}
+        todos = collect(vault_path, sources, include_archive, verbose)
         mark_overdue(todos, today)
 
-        if args.overdue:
+        if overdue:
             todos = [t for t in todos if t["overdue"]]
-        if args.not_started:
+        if not_started:
             todos = [t for t in todos if t.get("not_started")]
 
         todos.sort(key=sort_key)
         run.item_count = len(todos)
 
-        if args.format == "json":
+        if fmt == TodoFormat.json:
             print(json.dumps(todos, indent=2))
-        elif args.format == "csv":
+        elif fmt == TodoFormat.csv:
             print(render_csv(todos))
         else:
-            print(render_text(todos, by_file=args.by_file))
+            print(render_text(todos, by_file=by_file))
 
         overdue = sum(1 for t in todos if t.get("overdue"))
         dated = sum(1 for t in todos if t.get("date") and not t.get("overdue"))
@@ -422,4 +414,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    main()
+    app()
