@@ -10,7 +10,9 @@ from pathlib import Path
 
 import yaml
 from local_first_common.obsidian import split_frontmatter
-from local_first_common.tracking import timed_run
+from local_first_common.tracking import register_tool, timed_run
+
+_TOOL = register_tool("vault-query")
 
 
 def apply_fixes(
