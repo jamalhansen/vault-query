@@ -9,31 +9,8 @@ import sys
 from pathlib import Path
 
 import yaml
+from local_first_common.obsidian import split_frontmatter
 from local_first_common.tracking import timed_run
-
-
-def read_parts(filepath: Path) -> tuple[str, str] | None:
-    """Split a file into (raw_frontmatter_yaml, body_after_closing_delimiter).
-
-    Returns None if no valid frontmatter block is found.
-    """
-    try:
-        text = filepath.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return None
-
-    if not text.startswith("---"):
-        return None
-
-    rest = text[3:]
-    for delimiter in ("---", "..."):
-        pos = rest.find("\n" + delimiter)
-        if pos != -1:
-            fm_yaml = rest[:pos]
-            body = rest[pos + len(delimiter) + 1 :]  # everything after closing ---/...
-            return fm_yaml, body
-
-    return None
 
 
 def apply_fixes(
@@ -89,7 +66,12 @@ def process_vault(
     processed = changed = skipped = 0
 
     for md_file in sorted(vault_path.rglob("*.md")):
-        parts = read_parts(md_file)
+        try:
+            text = md_file.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            skipped += 1
+            continue
+        parts = split_frontmatter(text)
         if parts is None:
             skipped += 1
             continue
@@ -124,7 +106,7 @@ def process_vault(
                 default_flow_style=False,
                 sort_keys=False,
             )
-            md_file.write_text(f"---\n{new_yaml}---{body}", encoding="utf-8")
+            md_file.write_text(f"---\n{new_yaml}---\n{body}", encoding="utf-8")
 
     return processed, changed, skipped
 

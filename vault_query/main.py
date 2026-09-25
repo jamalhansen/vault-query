@@ -12,36 +12,8 @@ import tempfile
 from pathlib import Path
 
 import duckdb
-import yaml
+from local_first_common.obsidian import parse_frontmatter
 from local_first_common.tracking import timed_run
-
-
-def parse_frontmatter(filepath: Path) -> dict:
-    """Parse YAML frontmatter from a markdown file. Returns {} if none found."""
-    try:
-        text = filepath.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return {}
-
-    if not text.startswith("---"):
-        return {}
-
-    rest = text[3:]
-    end = -1
-    for delimiter in ("---", "..."):
-        pos = rest.find("\n" + delimiter)
-        if pos != -1:
-            end = pos
-            break
-
-    if end == -1:
-        return {}
-
-    try:
-        data = yaml.safe_load(rest[:end])
-        return data if isinstance(data, dict) else {}
-    except yaml.YAMLError:
-        return {}
 
 
 def scan_vault(vault_path: Path, verbose: bool = False) -> list[dict]:

@@ -1,8 +1,9 @@
 from pathlib import Path
 
 import duckdb
+from local_first_common.obsidian import parse_frontmatter
 
-from vault_query.main import build_table, parse_frontmatter, scan_vault
+from vault_query.main import build_table, scan_vault
 
 FIXTURES = Path(__file__).parent / "fixtures" / "sample_vault"
 
