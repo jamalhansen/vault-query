@@ -50,7 +50,10 @@ def build_table(con: duckdb.DuckDBPyConnection, records: list[dict]) -> None:
         return
 
     # Collect all keys so every row has the same schema (missing fields -> null)
-    all_keys = set().union(*records)
+    # Stable column order (path, filename, then frontmatter keys A-Z): a set iterates in
+    # a different order each run, which made `vq --schema` and `SELECT *` shuffle columns.
+    keys = set().union(*records)
+    all_keys = [k for k in ("path", "filename") if k in keys] + sorted(keys - {"path", "filename"})
     normalized = [{k: record.get(k) for k in all_keys} for record in records]
 
     with tempfile.NamedTemporaryFile(

@@ -89,3 +89,11 @@ class TestBuildTable:
         domains = {r[0]: r[1] for r in rows}
         assert domains["ai-tools"] == 1
         assert domains["platform"] == 1
+
+
+def test_columns_are_in_a_stable_order():
+    import duckdb
+
+    con = duckdb.connect()
+    build_table(con, [{"path": "a.md", "filename": "a", "zeta": 1, "alpha": 2}, {"path": "b.md", "filename": "b", "mid": 3}])
+    assert [r[0] for r in con.execute("DESCRIBE notes").fetchall()] == ["path", "filename", "alpha", "mid", "zeta"]
