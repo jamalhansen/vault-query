@@ -13,9 +13,7 @@ from pathlib import Path
 
 import duckdb
 from local_first_common.obsidian import parse_frontmatter
-from local_first_common.tracking import register_tool, timed_run
-
-_TOOL = register_tool("vault-query")
+from local_first_common.tracking import timed_run
 
 
 def scan_vault(vault_path: Path, verbose: bool = False) -> list[dict]:

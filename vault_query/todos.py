@@ -25,9 +25,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-from local_first_common.tracking import register_tool, timed_run
-
-_TOOL = register_tool("vault-query")
+from local_first_common.tracking import timed_run
 
 DATE_RE = re.compile(r"(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)")
 ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
