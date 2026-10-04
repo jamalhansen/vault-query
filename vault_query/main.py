@@ -173,7 +173,7 @@ def main(
             print(format_results(result, fmt.value))
         except duckdb.Error as e:
             print(f"Query error: {e}", file=sys.stderr)
-            raise typer.Exit(1)
+            raise typer.Exit(1) from None
 
 
 if __name__ == "__main__":
