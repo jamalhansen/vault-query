@@ -5,7 +5,6 @@ description = "Query Obsidian vault frontmatter with SQL using DuckDB"
 requires-python = ">=3.12"
 dependencies = [
     "typer>=0.15.0",
-    "click<8.3.2",  # 8.3.2 breaks typer 0.24.1 option parsing (same pin as the rest of the fleet)
     "duckdb>=1.0",
     "pyyaml>=6.0",
     "pandas>=2.0",
