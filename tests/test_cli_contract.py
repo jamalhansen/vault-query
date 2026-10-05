@@ -4,6 +4,7 @@ A change of CLI framework must not change them. Runs the installed scripts again
 copy of the sample vault (HOME points at a temp dir holding it as ~/vaults/Sample).
 Re-record deliberately with RECORD_CLI_CONTRACT=1.
 """
+
 import json
 import os
 import re
@@ -65,9 +66,15 @@ SEQUENCES = {
 def _run(argv: list[str], tmp: Path) -> dict:
     vault = tmp / "vaults" / "Sample"
     args = [a.replace("{V}", str(vault)).replace("{T}", str(tmp)) for a in argv]
-    env = {**os.environ, "HOME": str(tmp), "LOCAL_FIRST_TRACKING_DB": str(tmp / "tracking.duckdb"),
-           "VQ_TODOS_VAULT": "Sample"}
-    proc = subprocess.run([str(BIN / args[0]), *args[1:]], capture_output=True, text=True, env=env, cwd=tmp, check=False)
+    env = {
+        **os.environ,
+        "HOME": str(tmp),
+        "LOCAL_FIRST_TRACKING_DB": str(tmp / "tracking.duckdb"),
+        "VQ_TODOS_VAULT": "Sample",
+    }
+    proc = subprocess.run(
+        [str(BIN / args[0]), *args[1:]], capture_output=True, text=True, env=env, cwd=tmp, check=False
+    )
     norm = lambda t: t.replace(str(tmp), "<TMP>")
     result = {"exit": proc.returncode, "stdout": norm(proc.stdout)}
     if proc.returncode != 2:  # usage errors: only the exit code is part of the contract

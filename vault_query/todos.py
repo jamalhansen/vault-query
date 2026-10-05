@@ -171,9 +171,7 @@ def _date_part(value: object) -> str | None:
     return m.group(1) if m else None
 
 
-def parse_notes(
-    vault_path: Path, include_archive: bool = False, verbose: bool = False
-) -> list[dict]:
+def parse_notes(vault_path: Path, include_archive: bool = False, verbose: bool = False) -> list[dict]:
     """Find stray ``- [ ]`` checkboxes in note bodies (excludes reminders.md)."""
     skip = SKIP_DIRS - {"archive"} if include_archive else SKIP_DIRS
     reminders = vault_path / "ops" / "reminders.md"
@@ -217,9 +215,7 @@ def parse_notes(
     return todos
 
 
-def collect(
-    vault_path: Path, sources: set[str], include_archive: bool, verbose: bool
-) -> list[dict]:
+def collect(vault_path: Path, sources: set[str], include_archive: bool, verbose: bool) -> list[dict]:
     todos: list[dict] = []
     if "reminders" in sources:
         todos += parse_reminders(vault_path, verbose)
@@ -306,9 +302,18 @@ def render_text(todos: list[dict], by_file: bool = False) -> str:
 def render_csv(todos: list[dict]) -> str:
     buf = io.StringIO()
     cols = [
-        "source", "date", "overdue", "not_started",
-        "start", "scheduled", "recurrence", "priority",
-        "tag", "group", "text", "location",
+        "source",
+        "date",
+        "overdue",
+        "not_started",
+        "start",
+        "scheduled",
+        "recurrence",
+        "priority",
+        "tag",
+        "group",
+        "text",
+        "location",
     ]
     w = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore")
     w.writeheader()
@@ -355,13 +360,16 @@ def main(
     not_started: Annotated[
         bool, typer.Option("--not-started", "-n", help="Show only items whose 🛫 start date is in the future")
     ] = False,
-    by_file: Annotated[bool, typer.Option("--by-file", help="Group output by source file (useful for bulk cleanup)")] = False,
+    by_file: Annotated[
+        bool, typer.Option("--by-file", help="Group output by source file (useful for bulk cleanup)")
+    ] = False,
     fmt: Annotated[TodoFormat, typer.Option("--format", "-f", help="Output format")] = TodoFormat.text,
     include_archive: Annotated[
         bool, typer.Option("--include-archive", "-a", help="Include checkboxes under archive/ (skipped by default)")
     ] = False,
     today_arg: Annotated[
-        str | None, typer.Option("--today", metavar="YYYY-MM-DD", help="Override today's date for overdue calculation (testing)")
+        str | None,
+        typer.Option("--today", metavar="YYYY-MM-DD", help="Override today's date for overdue calculation (testing)"),
     ] = None,
     verbose: Annotated[bool, typer.Option("--verbose", "-V", help="Show debug output on stderr")] = False,
 ) -> None:

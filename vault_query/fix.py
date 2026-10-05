@@ -119,10 +119,12 @@ app = typer.Typer(add_completion=False)
 def main(
     vault: Annotated[str, typer.Argument(help="Vault name (in ~/vaults/) or absolute path")],
     map_file: Annotated[
-        str | None, typer.Option("--map", "-m", metavar="FILE", help="YAML file defining rename_keys and field_values mappings")
+        str | None,
+        typer.Option("--map", "-m", metavar="FILE", help="YAML file defining rename_keys and field_values mappings"),
     ] = None,
     lowercase_keys: Annotated[
-        bool, typer.Option("--lowercase-keys", "-l", help="Lowercase all frontmatter keys (applied after --map renames)")
+        bool,
+        typer.Option("--lowercase-keys", "-l", help="Lowercase all frontmatter keys (applied after --map renames)"),
     ] = False,
     apply: Annotated[bool, typer.Option("--apply", "-a", help="Write changes (default is dry-run)")] = False,
     verbose: Annotated[bool, typer.Option("--verbose", "-V")] = False,
@@ -162,7 +164,10 @@ def main(
         print(f"[{mode}] {vault_path}\n")
 
         processed, changed, skipped = process_vault(
-            vault_path, rename_keys, field_values, set_fields,
+            vault_path,
+            rename_keys,
+            field_values,
+            set_fields,
             lowercase_keys=lowercase_keys,
             apply=apply,
             verbose=verbose,

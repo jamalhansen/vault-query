@@ -58,9 +58,7 @@ def build_table(con: duckdb.DuckDBPyConnection, records: list[dict]) -> None:
     all_keys = [k for k in ("path", "filename") if k in keys] + sorted(keys - {"path", "filename"})
     normalized = [{k: record.get(k) for k in all_keys} for record in records]
 
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".ndjson", delete=False, encoding="utf-8"
-    ) as f:
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".ndjson", delete=False, encoding="utf-8") as f:
         for record in normalized:
             f.write(json.dumps(record, default=str) + "\n")
         tmp_path = f.name
@@ -105,7 +103,9 @@ def main(
     schema: Annotated[bool, typer.Option("--schema", "-s", help="Show available columns and types")] = False,
     db: Annotated[
         str | None,
-        typer.Option("--db", "-d", metavar="FILE", help="Persist DuckDB to file instead of in-memory (reuse with --reuse)"),
+        typer.Option(
+            "--db", "-d", metavar="FILE", help="Persist DuckDB to file instead of in-memory (reuse with --reuse)"
+        ),
     ] = None,
     reuse: Annotated[
         bool, typer.Option("--reuse", "-r", help="Reuse an existing --db file without re-scanning the vault")

@@ -22,11 +22,15 @@ def _tracking_db():
 
 
 def _last_run(tool_name):
-    return _tracking_db().execute(
-        "SELECT tool_name, item_count, success FROM processing_log "
-        "WHERE tool_name = ? ORDER BY created_at DESC LIMIT 1",
-        [tool_name],
-    ).fetchone()
+    return (
+        _tracking_db()
+        .execute(
+            "SELECT tool_name, item_count, success FROM processing_log "
+            "WHERE tool_name = ? ORDER BY created_at DESC LIMIT 1",
+            [tool_name],
+        )
+        .fetchone()
+    )
 
 
 def test_vq_logs_a_processing_run(monkeypatch):

@@ -34,3 +34,6 @@ dev = [
 
 [tool.fleet.exempt]
 entry-points = "three separate commands (vq, vq-fix, vq-todos), each a Typer app in its own module"
+
+[tool.ruff]
+line-length = 120

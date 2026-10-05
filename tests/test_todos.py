@@ -28,8 +28,14 @@ REMINDERS = """\
 
 QUEUE = {
     "tasks": [
-        {"id": "t1", "status": "pending", "target": "Note A", "current_phase": "connect",
-         "created": "2026-05-03T20:00:00Z", "type": "capture"},
+        {
+            "id": "t1",
+            "status": "pending",
+            "target": "Note A",
+            "current_phase": "connect",
+            "created": "2026-05-03T20:00:00Z",
+            "type": "capture",
+        },
         {"id": "t2", "status": "done", "target": "Note B"},
     ]
 }
@@ -130,9 +136,7 @@ class TestObsidianFields:
         assert f["priority"] == "low"
 
     def test_prefers_due_emoji_over_body_date(self, tmp_path):
-        (tmp_path / "note.md").write_text(
-            "- [ ] Do the thing (2026-06-01) #tag 📅 2026-07-15\n"
-        )
+        (tmp_path / "note.md").write_text("- [ ] Do the thing (2026-06-01) #tag 📅 2026-07-15\n")
         todos = parse_notes(tmp_path)
         assert todos[0]["date"] == "2026-07-15"
 
