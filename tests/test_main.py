@@ -62,7 +62,7 @@ class TestBuildTable:
         records = scan_vault(FIXTURES)
         con = duckdb.connect(":memory:")
         build_table(con, records)
-        count = con.execute("SELECT count(*) FROM notes").fetchone()[0]
+        count = (con.execute("SELECT count(*) FROM notes").fetchone() or (0,))[0]
         assert count == 3
 
     def test_empty_records_creates_minimal_table(self):

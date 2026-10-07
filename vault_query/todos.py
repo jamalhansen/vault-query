@@ -410,13 +410,13 @@ def main(
         else:
             print(render_text(todos, by_file=by_file))
 
-        overdue = sum(1 for t in todos if t.get("overdue"))
+        n_overdue = sum(1 for t in todos if t.get("overdue"))
         dated = sum(1 for t in todos if t.get("date") and not t.get("overdue"))
-        undated = len(todos) - overdue - dated
-        not_started = sum(1 for t in todos if t.get("not_started"))
+        undated = len(todos) - n_overdue - dated
+        n_not_started = sum(1 for t in todos if t.get("not_started"))
         print(
             f"\nDone. Total: {len(todos)} "
-            f"(overdue {overdue}, dated {dated}, undated {undated}, not-started {not_started})",
+            f"(overdue {n_overdue}, dated {dated}, undated {undated}, not-started {n_not_started})",
             file=sys.stderr,
         )
 

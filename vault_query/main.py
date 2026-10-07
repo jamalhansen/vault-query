@@ -66,12 +66,12 @@ def build_table(con: duckdb.DuckDBPyConnection, records: list[dict]) -> None:
     con.execute(f"CREATE TABLE notes AS SELECT * FROM read_ndjson_auto('{tmp_path}')")
 
 
-def format_results(result: duckdb.DuckDBPyRelation, fmt: str) -> str:
+def format_results(result: duckdb.DuckDBPyConnection | duckdb.DuckDBPyRelation, fmt: str) -> str:
     """Format query results as table, CSV, or JSON."""
     if fmt == "csv":
         return result.df().to_csv(index=False)
     if fmt == "json":
-        return result.df().to_json(orient="records", indent=2)
+        return result.df().to_json(orient="records", indent=2) or ""
     # table
     df = result.df()
     if df.empty:
@@ -137,6 +137,7 @@ def main(
                 raise typer.Exit(1)
 
         # Scan
+        records: list[dict] = []
         if not reuse:
             if verbose:
                 print(f"Scanning {vault_path} ...", file=sys.stderr)
@@ -168,6 +169,9 @@ def main(
             return
 
         # Run query
+        if not query:
+            print("No query given. Pass SQL against the notes table, or --schema to list columns.", file=sys.stderr)
+            raise typer.Exit(1)
         try:
             result = con.execute(query)
             print(format_results(result, fmt.value))

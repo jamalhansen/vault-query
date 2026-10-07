@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -90,7 +91,7 @@ def _fresh(tmp: Path) -> Path:
 
 
 def test_cli_contract(tmp_path_factory):
-    results = {name: _run(argv, _fresh(tmp_path_factory.mktemp(name))) for name, argv in CASES.items()}
+    results: dict[str, Any] = {name: _run(argv, _fresh(tmp_path_factory.mktemp(name))) for name, argv in CASES.items()}
     for name, seq in SEQUENCES.items():
         tmp = _fresh(tmp_path_factory.mktemp(name))
         results[name] = [_run(argv, tmp) for argv in seq]

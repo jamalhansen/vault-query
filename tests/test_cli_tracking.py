@@ -22,7 +22,7 @@ def _tracking_db():
 
 
 def _last_run(tool_name):
-    return (
+    row = (
         _tracking_db()
         .execute(
             "SELECT tool_name, item_count, success FROM processing_log "
@@ -31,6 +31,8 @@ def _last_run(tool_name):
         )
         .fetchone()
     )
+    assert row is not None, f"no processing_log row for {tool_name}"
+    return row
 
 
 def test_vq_logs_a_processing_run(monkeypatch):
